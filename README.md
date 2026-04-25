@@ -143,7 +143,7 @@ granular-recipes/
     circular_buffer_stereo.h      # Stereo circular buffer
     window_lut.h                  # Windowing lookup table
     fourPole.h                    # 4-pole resonant filter
-    spsc_queue.h                  # Lock-free single-producer single-consumer queue
+    spsc_queue.h                  # Lock-free single-producer single-consumer circular buffer
     config.h, utils.h             # Constants and math utilities
   src/                            # Framework sources
     recipes/                      # Recipe implementations (granular + spectral)
