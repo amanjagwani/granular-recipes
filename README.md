@@ -23,12 +23,22 @@ Each recipe maps Energy (0-1) and Intensity (0-1) to correlated parameter trajec
 
 ## Included Recipes
 
-| Recipe       | Character                  | Energy Controls                | Intensity Controls                  |
-| ------------ | -------------------------- | ------------------------------ | ----------------------------------- |
-| **Lush**     | Evolving harmonic clouds   | Density, grain size, scan rate | Scan center, scan depth             |
-| **Sprinkle** | Percussive droplets        | Grain size, density, hold rate | Reverse probability, position depth |
-| **Cloud**    | Dense swirling texture     | Density, grain size, jitter    | Stereo spread, scan depth           |
-| **Stutter**  | BPM-synced rhythmic glitch | Grain size, density            | Subdivision (whole to 32nd)         |
+### Granular
+
+| Recipe       | Character                  | Energy Controls                        | Intensity Controls                                     |
+| ------------ | -------------------------- | -------------------------------------- | ------------------------------------------------------ |
+| **Lush**     | Evolving harmonic clouds   | Grain size, density, jitter            | Scan rate/center/depth, feedback, pitch (fifths→stack) |
+| **Sprinkle** | Percussive droplets        | Grain size, density, density jitter    | Spread, hold rate, position depth, reverse, pitch      |
+| **Cloud**    | Dense swirling texture     | Grain size, density, jitter, scan rate | Stereo spread, scan depth                              |
+| **Stutter**  | BPM-synced rhythmic glitch | Grain size, density                    | Subdivision (whole to 32nd)                            |
+
+### Spectral
+
+| Recipe                | Character                  | Energy Controls         | Intensity Controls           |
+| --------------------- | -------------------------- | ----------------------- | ---------------------------- |
+| **Spectral Disperse** | Per-band time-scatter      | Band spread, jitter     | Pitch shift (-12 to +24st)   |
+| **Spectral Drift**    | Wandering spectral freeze  | Jitter / randomization  | Blur frames (temporal smear) |
+| **Spectral Stutter**  | BPM-synced spectral glitch | Pitch shift probability | Subdivision (whole to 32nd)  |
 
 ## Buffer Injection
 
@@ -157,5 +167,5 @@ make program-dfu
 
 - **Core DSP**: Grain engine, circular buffer, window LUT, grain pool. No platform dependencies.
 - **Recipe API**: `gr::Recipe` base class. Recipes use only core utilities (`gr::core::Random`, `gr::core::Phasor`, `gr::core::DcBlock`).
-- **Engine**: Orchestrates recipes + granular processor + LPF + dry/wet mix. Lock-free SPSC queues for thread-safe macro/recipe changes.
+- **Engine**: Orchestrates recipes + granular processor + LPF + dry/wet mix. Lock-free SPSC circular buffers for thread-safe macro/recipe changes.
 - **Platform Binding**: Maps hardware controls to Engine calls. The Daisy Pod example is the reference binding.
