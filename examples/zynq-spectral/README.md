@@ -21,15 +21,15 @@ The PS controls `spectral_buffer` (per-band read positions, blur) and `pvoc_synt
 
 ## HLS IPs
 
-| IP                   | Function                                                       |
-| -------------------- | -------------------------------------------------------------- |
-| `stft_input`         | Hop-based frame collection with overlap                        |
-| `window_apply`       | Hann window (analysis + synthesis)                             |
-| `fft_mirror_replace` | Conjugate symmetry enforcement                                 |
-| `pvoc_analysis`      | Rectangular → polar (magnitude, frequency Hz)                  |
-| `spectral_buffer`    | 32-frame circular buffer, 3 per-band read pointers, pvsblur    |
-| `pvoc_synthesis`     | Polar → rectangular with pvscale bin remapping for pitch shift |
-| `overlap_add_stft`   | Overlap-add reconstruction                                     |
+| IP                   | Function                                                          |
+| -------------------- | ----------------------------------------------------------------- |
+| `stft_input`         | Hop-based frame collection with overlap                           |
+| `window_apply`       | Hann window (analysis + synthesis)                                |
+| `fft_mirror_replace` | Conjugate symmetry enforcement                                    |
+| `pvoc_analysis`      | Rectangular → polar (magnitude, frequency Hz)                     |
+| `spectral_buffer`    | Spectral frame circular buffer, 3 per-band read pointers, pvsblur |
+| `pvoc_synthesis`     | Polar → rectangular with pvscale bin remapping for pitch shift    |
+| `overlap_add_stft`   | Overlap-add reconstruction                                        |
 
 ## Spectral Recipes
 
