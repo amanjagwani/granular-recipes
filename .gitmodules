@@ -1,0 +1,6 @@
+[submodule "examples/daisy-pod/libs/libDaisy"]
+	path = examples/daisy-pod/libs/libDaisy
+	url = https://github.com/electro-smith/libDaisy.git
+[submodule "examples/daisy-pod/libs/DaisySP"]
+	path = examples/daisy-pod/libs/DaisySP
+	url = https://github.com/electro-smith/DaisySP.git
