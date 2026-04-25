@@ -1,0 +1,17 @@
+.metadata/
+.analytics
+IDE.log
+RemoteSystemsTempFiles/
+
+
+v7_spectral_granular_pvsblur/zynq_fsbl/
+v7_spectral_granular_pvsblur/ps7_cortexa9_0/
+v7_spectral_granular_pvsblur/export/
+v7_spectral_granular_pvsblur/logs/
+v7_spectral_granular_pvsblur/resources/
+
+spectral_granular_vitis_app/Debug/
+spectral_granular_vitis_app/Release/
+
+spectral_granular_vitis_app_system/Debug/
+spectral_granular_vitis_app_system/Release/

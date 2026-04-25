@@ -4,22 +4,42 @@ A cross-platform C++ granular synthesis framework where **recipes** define how g
 
 A recipe is like a developer-level behavioral preset. Developers implement hooks to manipulate a multi-dimensional parameter space, defining a particular textural identity for each recipe. Performers control the texture through two macros: **Energy** and **Intensity**.
 
+The framework supports two processing domains:
+
+- **Granular** (time-domain) — grain-based synthesis with a circular buffer, grain pool, and windowing engine
+- **Spectral** (frequency-domain) — STFT-based processing with per-band frame buffer control, phase vocoder analysis/synthesis, and temporal blur
+
 ## How It Works
 
-The framework provides a granular engine (grain pool, circular buffer, windowing, utilities etc.) and a `Recipe` base class with five hooks:
+### Granular Recipes
+
+The granular engine provides a grain pool, circular buffer, windowing, and utilities. The `Recipe` base class has five hooks:
 
 ```cpp
 class Recipe {
 public:
     virtual void Init(float sampleRate, size_t bufSize) = 0;
-    virtual void UpdateParamsFromEnergy() = 0;   // Energy macro -> parameter trajectories
-    virtual void UpdateParamsFromIntensity() {}   // Intensity macro -> secondary behavior
-    virtual void OnSample() = 0;                 // Per-sample animation (scanning, clocks)
-    virtual void OnSpawn() = 0;                  // Per-grain decisions (pitch, reverse)
+    virtual void UpdateParamsFromEnergy() = 0;
+    virtual void UpdateParamsFromIntensity() {}
+    virtual void OnSample() = 0;    // Per-sample animation
+    virtual void OnSpawn() = 0;     // Per-grain decisions
 };
 ```
 
-Each recipe maps Energy (0-1) and Intensity (0-1) to correlated parameter trajectories, creating a musically coherent texture from a single pair of controls.
+### Spectral Recipes
+
+Spectral recipes operate on STFT frames rather than audio samples. The `SpectralRecipe` base class:
+
+```cpp
+class SpectralRecipe {
+public:
+    virtual void Init(float sr, uint32_t hopSize, uint32_t bufferDepth) = 0;
+    virtual void UpdateParamsFromEnergy() = 0;
+    virtual void UpdateParamsFromIntensity() {}
+    virtual void OnHop() = 0;       // Per-STFT-frame
+    virtual void OnSample() {}      // Per-sample smooth modulation
+};
+```
 
 ## Included Recipes
 
@@ -36,9 +56,23 @@ Each recipe maps Energy (0-1) and Intensity (0-1) to correlated parameter trajec
 
 | Recipe                | Character                  | Energy Controls         | Intensity Controls           |
 | --------------------- | -------------------------- | ----------------------- | ---------------------------- |
-| **Spectral Disperse** | Per-band time-scatter      | Band spread, jitter     | Pitch shift (-12 to +24st)   |
 | **Spectral Drift**    | Wandering spectral freeze  | Jitter / randomization  | Blur frames (temporal smear) |
+| **Spectral Disperse** | Per-band time-scatter      | Band spread, jitter     | Pitch shift (-12 to +24st)   |
 | **Spectral Stutter**  | BPM-synced spectral glitch | Pitch shift probability | Subdivision (whole to 32nd)  |
+
+## Engines
+
+### Engine (Granular)
+
+Orchestrates granular recipes: manages the grain processor, 4-pole resonant filter, dry/wet mixing, and lock-free macro/recipe switching. Provides `OnBlock()` + `Process()` called from an audio callback.
+
+### SpectralEngine
+
+Orchestrates spectral recipes for FPGA or other STFT platforms. Manages recipe switching and macro routing. Three methods:
+
+- `OnHop(writePtr)` — called per spectral frame, drains queues, delegates to recipe
+- `Process()` — called at audio rate, delegates per-sample modulation
+- `GetOutput()` — snapshots current params into a `SpectralHopOutput` struct for the platform to write to hardware
 
 ## Buffer Injection
 
@@ -100,61 +134,21 @@ public:
     }
 
     void UpdateParamsFromIntensity() override {
-        const float intens = params_.intensity;
-        params_.spread = 0.5f + 0.5f * intens;
+        params_.spread = 0.5f + 0.5f * params_.intensity;
     }
 
-    void OnSample() override {
-        // Per-sample parameter animation
-        params_.lookback = 0.1f;
-    }
-
-    void OnSpawn() override {
-        // Per-grain modulation
-        params_.pitchSt = 0.0f;
-    }
+    void OnSample() override { params_.lookback = 0.1f; }
+    void OnSpawn() override { params_.pitchSt = 0.0f; }
 };
 
 } // namespace gr
 ```
 
-To use it, add an instance to your `Recipe*` array and pass it to `Engine::Init()` — no engine changes needed:
+## Examples
 
-```cpp
-static gr::MyRecipe myRecipe;
-static gr::Recipe *recipes[] = {&myRecipe, /* ... */};
-```
+### Daisy Pod (Granular)
 
-## Directory Structure
-
-```
-granular-recipes/
-  include/granular_recipes/       # Framework headers (zero platform dependencies)
-    core/                         # Utilities: random, phasor, dc_block, subdivision_clock
-    recipes/                      # Recipe headers (lush, sprinkle, cloud, stutter,
-                                  #   spectral_disperse, spectral_drift, spectral_stutter)
-    recipe.h                      # Recipe base class (granular)
-    spectral_recipe.h             # SpectralRecipe base class
-    engine.h                      # Engine orchestration + SPSC queues
-    granular_processor.h          # Core grain engine
-    granular_params.h             # Granular parameter struct
-    spectral_params.h             # Spectral parameter struct
-    grain.h, grain_pool.h         # Grain types and pool management
-    circular_buffer_stereo.h      # Stereo circular buffer
-    window_lut.h                  # Windowing lookup table
-    fourPole.h                    # 4-pole resonant filter
-    spsc_queue.h                  # Lock-free single-producer single-consumer circular buffer
-    config.h, utils.h             # Constants and math utilities
-  src/                            # Framework sources
-    recipes/                      # Recipe implementations (granular + spectral)
-  examples/
-    daisy-pod/                    # Daisy Pod hardware example
-      libs/libDaisy/, libs/DaisySP/
-```
-
-## Building the Daisy Pod Example
-
-Requires the [Daisy Toolchain](https://github.com/electro-smith/DaisyWiki/wiki/1.-Setting-Up-Your-Development-Environment).
+Time-domain granular synthesis on the [Daisy Pod](https://www.electro-smith.com/daisy/pod) hardware. Audio callback processes grains in real-time. Knobs, encoder, and MIDI control recipes and macros.
 
 ```bash
 cd examples/daisy-pod
@@ -163,9 +157,48 @@ make
 make program-dfu
 ```
 
+### Zynq Spectral (FPGA)
+
+Real-time spectral granular processing on a Zybo Z7-020 (Xilinx Zynq-7020). All signal processing runs in programmable logic via custom HLS IPs:
+
+- **STFT pipeline**: `stft_input` → `window_apply` → FFT → `fft_mirror_replace` → `pvoc_analysis` → `spectral_buffer` → `pvoc_synthesis` → IFFT → `overlap_add_stft`
+- **pvoc_analysis/synthesis**: Phase vocoder.
+- **spectral_buffer**: Circular frame buffer with 3 per-band read pointers and pvsblur (temporal averaging of magnitude + frequency).
+- **PS app**: ARM runs `SpectralEngine` + spectral recipes, writes control params to PL via AXI-Lite each hop.
+
+See [`examples/zynq-spectral/README.md`](examples/zynq-spectral/README.md) for build instructions.
+
+## Directory Structure
+
+```
+granular-recipes/
+  include/granular_recipes/       # Framework headers (zero platform dependencies)
+    core/                         # Utilities: random, phasor, dc_block, subdivision_clock
+    recipes/                      # Recipe headers (granular + spectral)
+    recipe.h                      # Recipe base class (granular)
+    spectral_recipe.h             # SpectralRecipe base class
+    engine.h                      # Granular engine orchestration
+    spectral_engine.h             # Spectral engine orchestration
+    granular_params.h             # Granular parameter struct
+    spectral_params.h             # Spectral parameter struct
+    granular_processor.h          # Core grain engine
+    grain.h, grain_pool.h         # Grain types and pool management
+    circular_buffer_stereo.h      # Stereo circular buffer
+    window_lut.h                  # Windowing lookup table
+    fourPole.h                    # 4-pole resonant filter
+    spsc_queue.h                  # Lock-free SPSC circular buffer
+    config.h, utils.h             # Constants and math utilities
+  src/                            # Framework sources
+    recipes/                      # Recipe implementations (granular + spectral)
+  examples/
+    daisy-pod/                    # Daisy Pod hardware example (granular)
+    zynq-spectral/                # Zybo Z7-020 FPGA example (spectral)
+```
+
 ## Architecture
 
-- **Core DSP**: Grain engine, circular buffer, window LUT, grain pool. No platform dependencies.
-- **Recipe API**: `gr::Recipe` base class. Recipes use only core utilities (`gr::core::Random`, `gr::core::Phasor`, `gr::core::DcBlock`).
-- **Engine**: Orchestrates recipes + granular processor + LPF + dry/wet mix. Lock-free SPSC circular buffers for thread-safe macro/recipe changes.
-- **Platform Binding**: Maps hardware controls to Engine calls. The Daisy Pod example is the reference binding.
+- **Time-domain DSP**: Grain engine, circular buffer, window LUT, grain pool. No platform dependencies.
+- **Spectral DSP**: Phase vocoder analysis/synthesis, spectral frame buffer, temporal blur. Runs on FPGA PL, controlled by PS.
+- **Recipe API**: `gr::Recipe` (granular) and `gr::SpectralRecipe` (spectral). Recipes use only core utilities.
+- **Engines**: `gr::Engine` (granular) and `gr::SpectralEngine` (spectral). Lock-free SPSC circular buffers for thread-safe macro/recipe changes.
+- **Platform Binding**: Maps hardware controls to engine calls. See `examples/` for reference bindings.

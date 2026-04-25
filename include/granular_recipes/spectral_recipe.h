@@ -37,6 +37,7 @@ namespace gr
         void SetWritePtr(uint32_t wp) { params_.writePtr = wp; }
 
         SpectralParams *GetParams() { return &params_; }
+        const SpectralParams *GetParams() const { return &params_; }
 
     protected:
         SpectralParams params_{};
